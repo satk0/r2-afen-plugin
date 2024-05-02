@@ -5,7 +5,7 @@ Radare2 plugin to rename expressions
 This plugin should register a new `afen` command that should rename any expression
 to any text, thus enabling a creation of variables from expressions.
 
-## To run:
+## Building and installing the plugin:
 
 Build:
 
@@ -14,4 +14,8 @@ Build:
 Install:
 
     meson install -C build
+
+## Usage:
+
+    r2 -e asm.pseudo=true <file>
 
