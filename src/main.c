@@ -4,6 +4,10 @@
 
 #include <r_core.h>
 
+// TODO:
+// 1. Store multiple renamings, not only one as of right now.
+// 2. Make it accept multispace quoted arguments, i.e.: "rbp + rax - 0x1024".
+
 static char* old_name_str;
 static char* new_name_str;
 

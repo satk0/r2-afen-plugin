@@ -2,6 +2,9 @@
 .cache/
 .ccls-cache/
 
+# For linking with ccls
+compile_commands.json
+
 # Prerequisites
 *.d
 
