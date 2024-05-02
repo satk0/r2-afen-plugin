@@ -4,11 +4,17 @@
 
 #include <r_core.h>
 
+static char* old_name_str;
+static char* new_name_str;
+
 // afen parser
 static int r_afen_parse(RParse *p, const char *data, char *str) {
 	int res = true;
 	char *input = strdup (data);
-	input = r_str_replace_all (input, "eax, 0", "LOCALVAR");
+
+	if (old_name_str && new_name_str)
+		input = r_str_replace_all (input, old_name_str, new_name_str);
+
 	strcpy (str, input);
 	return res;
 }
@@ -18,8 +24,18 @@ static int r_cmd_init(void *user, const char *input) {
 	RCmd *rcmd = (RCmd *) user;
 	RCore *core = (RCore *) rcmd->data;
 
+	old_name_str = (char*) r_malloc(50 * sizeof(char));
+	new_name_str = (char*) r_malloc(50 * sizeof(char));
+
 	core->parser->cur->parse = r_afen_parse;
 	
+	return true;
+}
+
+static int r_cmd_fini(void *user, const char *input) {
+	r_free(old_name_str);
+	r_free(new_name_str);
+
 	return true;
 }
 
@@ -39,6 +55,9 @@ static int r_cmd_afen_client(void *user, const char *input) {
 		RListIter *new_name = r_list_iter_get_next(s_iter);
 		RListIter *old_name = r_list_iter_get_next(new_name);
 
+		strcpy(old_name_str, old_name->data);
+		strcpy(new_name_str, new_name->data);
+
 		r_cons_printf ("old_name = %s\n", (char*) old_name->data);
 		r_cons_printf ("new_name = %s\n", (char*) new_name->data);
 
@@ -56,7 +75,8 @@ RCorePlugin r_core_plugin_afen = {
 		.license = "GPLv3",
 	},
 	.call = r_cmd_afen_client,
-	.init = r_cmd_init
+	.init = r_cmd_init,
+	.fini = r_cmd_fini
 };
 
 
