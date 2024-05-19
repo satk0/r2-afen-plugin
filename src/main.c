@@ -45,25 +45,32 @@ static int r_cmd_fini(void *user, const char *input) {
 
 static int r_cmd_afen_client(void *user, const char *input) {
 	if (r_str_startswith (input, "afen")) {
+		int *argc = (int*) malloc(sizeof(int));
+		char **argv = r_str_argv(input, argc);
+		//r_cons_printf("num of args: %d", *argc);
+		//r_cons_printf("arg 1: %s", argv[1]);
+
+		/*
 		RList *splitted = r_str_split_list((char*)input, " ", 3);
 		int num_of_spaces = r_list_length(splitted);
+		*/
 
-		if (num_of_spaces != 3) {
+		if (*argc != 3) {
 			r_cons_printf("Usage: afen new_name old_name\n");
 			return true;
 		}
 
-		RListIter *s_iter = NULL;
-		s_iter = splitted->head;
+		//RListIter *s_iter = NULL;
+		//s_iter = splitted->head;
 
-		RListIter *new_name = r_list_iter_get_next(s_iter);
-		RListIter *old_name = r_list_iter_get_next(new_name);
+		//RListIter *new_name = r_list_iter_get_next(s_iter);
+		//RListIter *old_name = r_list_iter_get_next(new_name);
 
-		strcpy(old_name_str, old_name->data);
-		strcpy(new_name_str, new_name->data);
+		strcpy(new_name_str, argv[1]);
+		strcpy(old_name_str, argv[2]);
 
-		r_cons_printf ("old_name = %s\n", (char*) old_name->data);
-		r_cons_printf ("new_name = %s\n", (char*) new_name->data);
+		r_cons_printf ("old_name = %s\n", (char*) old_name_str);
+		r_cons_printf ("new_name = %s\n", (char*) new_name_str);
 
 		return true;
 	}
