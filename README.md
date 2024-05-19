@@ -1,6 +1,6 @@
 # afen plugin
 
-Author: satk0
+NOTE: Making this plugin would not be possible without the help from pancake. Big thanks to him!
 
 Radare2 plugin to rename expressions
 
