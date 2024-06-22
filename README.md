@@ -17,7 +17,7 @@ Install:
 
     meson install -C build
 
-## Running:
+## Run:
 
     r2 -e asm.pseudo=true <file>
 
