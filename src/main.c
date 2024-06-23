@@ -35,7 +35,7 @@ static int r_parse_afen(RParse *p, const char *data, char *str) {
 
 // RParse plugin Definition Info
 RParsePlugin r_parse_plugin_afen = {
-	.name = "hello",
+	.name = "rparse-afen",
 	.desc = "Afen parse plugin",
 	.parse = r_parse_afen,
 };
