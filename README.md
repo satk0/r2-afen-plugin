@@ -1,5 +1,7 @@
 # afen plugin
 
+Author: satk0
+
 NOTE: Making this plugin would not be possible without the help from pancake. Big thanks to him!
 
 Radare2 plugin to rename expressions
@@ -19,7 +21,7 @@ Install:
 
 ## Run:
 
-    r2 -e asm.parser=rparse-afen -e asm.pseudo=true <file> 
+    r2 -e asm.parser=afen -e asm.pseudo=true <file>
 
 ## Usage:
 
