@@ -61,7 +61,19 @@ static int r_core_fini_afen(void *user, const char *input) {
 }
 
 static int r_core_call_afen(void *user, const char *input) {
+	RCmd *rcmd = (RCmd *) user;
+	RCore *core = (RCore *) rcmd->data;
+
 	if (r_str_startswith (input, "afen")) {
+		r_cons_printf ("offset: 0x%08" PFMT64x "\n", core->offset);
+		RAnalFunction *fcn = r_anal_get_function_at (core->anal, core->offset);
+
+		if (fcn) {
+			r_cons_printf ("Function at 0x%08" PFMT64x "\n", fcn->addr);
+		} else {
+			r_cons_printf ("No Function at 0x%08" PFMT64x "\n", core->offset);
+		}
+
 		int *argc = (int*) malloc (sizeof (int));
 		char **argv = r_str_argv (input, argc);
 
