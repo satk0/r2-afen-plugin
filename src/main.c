@@ -61,8 +61,7 @@ static int r_core_fini_afen(void *user, const char *input) {
 }
 
 static int r_core_call_afen(void *user, const char *input) {
-	RCmd *rcmd = (RCmd *) user;
-	RCore *core = (RCore *) rcmd->data;
+	RCore *core = (RCore *) user;
 
 	if (r_str_startswith (input, "afen")) {
 		r_cons_printf ("offset: 0x%08" PFMT64x "\n", core->offset);
