@@ -81,8 +81,9 @@ static int r_core_init_afen(void *user, const char *input) {
 
 	r_parse_plugin_add (core->parser, &r_parse_plugin_afen);
 
-	HtUP /*<ut64 fcnptr, RAfenRepl *repl>*/ *ht = ht_up_new (NULL, repl_value_free, NULL);
+	/*<ut64 fcnptr, RAfenRepl *repl>*/ ht = ht_up_new (NULL, repl_value_free, NULL);
 	if (!ht) {
+		R_LOG_ERROR ("Fail to initialize hashtable");
 		ht_up_free (ht);
 		return false;
 	}
@@ -110,7 +111,6 @@ static int r_core_call_afen(void *user, const char *input) {
 	RCore *core = (RCore *) user;
 
 	if (r_str_startswith (input, "afen")) {
-		r_cons_printf ("offset: 0x%08" PFMT64x "\n", core->offset);
 		RAnalFunction *fcn = r_anal_get_function_at (core->anal, core->offset);
 
 		if (fcn) {
@@ -132,20 +132,17 @@ static int r_core_call_afen(void *user, const char *input) {
 
 		if (!argv) {
 			R_LOG_ERROR ("Can't get args");
-			return true;
+			return false;
 		}
-
-		R_LOG_INFO ("Non repl:");
-		R_LOG_INFO ("New Name:", argv[1]);
-		R_LOG_INFO ("Old Name:", argv[2]);
 
 		RAfenRepl *repl = (RAfenRepl*) malloc (sizeof (RAfenRepl));
 		repl->new_name = argv[1];
 		repl->old_name = argv[2];
+		
 
 		R_LOG_INFO ("Repl:");
-		R_LOG_INFO ("New Name:", repl->new_name);
-		R_LOG_INFO ("Old Name:", repl->old_name);
+		R_LOG_INFO ("New Name: %s", repl->new_name);
+		R_LOG_INFO ("Old Name: %s", repl->old_name);
 		ht_up_insert (ht, fcn->addr, repl);
 		R_LOG_INFO ("LOL0");
 
