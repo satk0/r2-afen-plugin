@@ -4,27 +4,52 @@
 
 #include <r_core.h>
 
-static RList *old_names;
-static RList *new_names;
+typedef struct RAfenRepl {
+	char *old_name;
+	char *new_name;
+} RAfenRepl;
+
+static R_TH_LOCAL RList *old_names;
+static R_TH_LOCAL RList *new_names;
+static R_TH_LOCAL HtUP *ht; // hash table
 
 // afen parser
 static int r_parse_afen(RParse *p, const char *data, char *str) {
 	char *input = strdup (data);
 
-	int n = r_list_length (old_names);
+	//RCmd *rcmd = (RCmd *) p->user;
+	//RCore *core = (RCore *) rcmd->data;
+	RCore *core = (RCore *) p->analb.anal->user;
+
+	int i, n = r_list_length (old_names);
+	R_LOG_INFO ("offset: 0x%08" PFMT64x "\n", core->offset);
+	RAnalFunction *fcn = r_anal_get_function_at (core->anal, core->offset);
+
+	if (fcn) {
+		R_LOG_INFO ("Function at 0x%08" PFMT64x "\n", fcn->addr);
+	} else {
+		R_LOG_INFO ("No Function at 0x%08" PFMT64x "\n", core->offset);
+		return false;
+	}
+
+	RAfenRepl *repl = ht_up_find (ht, fcn->addr, NULL);
+	if (repl) {
+		R_LOG_INFO ("LOL");
+		R_LOG_INFO ("New name: %s", repl->new_name);
+		R_LOG_INFO ("Old name: %s", repl->old_name);
+	}
+
+
 
 	if (n) {
-		RListIter *s_iter_old = NULL;
-		RListIter *s_iter_new = NULL;
+		RListIter *sio = old_names->head;
+		RListIter *sin = new_names->head;
 
-		s_iter_old = old_names->head;
-		s_iter_new = new_names->head;
+		for (i = 0; i < n; i++) {
+			input = r_str_replace_all (input, sio->data, sin->data);
 
-		for (int i = 0; i < n; ++i) {
-			input = r_str_replace_all (input, s_iter_old->data, s_iter_new->data);
-
-			s_iter_old = r_list_iter_get_next (s_iter_old);
-			s_iter_new = r_list_iter_get_next (s_iter_new);
+			sio = r_list_iter_get_next (sio);
+			sin = r_list_iter_get_next (sin);
 		}
 
 	}
@@ -40,6 +65,15 @@ RParsePlugin r_parse_plugin_afen = {
 	.parse = r_parse_afen,
 };
 
+static inline void repl_value_free(HtUPKv *kv) {
+	RAfenRepl *repl = (RAfenRepl *) kv->value;
+	if (repl) {
+		R_FREE (repl->old_name);
+		R_FREE (repl->new_name);
+	}
+}
+
+
 // sets afen parser
 static int r_core_init_afen(void *user, const char *input) {
 	RCmd *rcmd = (RCmd *) user;
@@ -47,8 +81,15 @@ static int r_core_init_afen(void *user, const char *input) {
 
 	r_parse_plugin_add (core->parser, &r_parse_plugin_afen);
 
+	HtUP /*<ut64 fcnptr, RAfenRepl *repl>*/ *ht = ht_up_new (NULL, repl_value_free, NULL);
+	if (!ht) {
+		ht_up_free (ht);
+		return false;
+	}
+
 	old_names = r_list_new ();
 	new_names = r_list_new ();
+	// newf instead of new
 	
 	return true;
 }
@@ -56,6 +97,11 @@ static int r_core_init_afen(void *user, const char *input) {
 static int r_core_fini_afen(void *user, const char *input) {
 	r_list_free (old_names);
 	r_list_free (new_names);
+	old_names = NULL;
+	new_names = NULL;
+
+	ht_up_free (ht);
+	ht = NULL;
 
 	return true;
 }
@@ -71,15 +117,37 @@ static int r_core_call_afen(void *user, const char *input) {
 			r_cons_printf ("Function at 0x%08" PFMT64x "\n", fcn->addr);
 		} else {
 			r_cons_printf ("No Function at 0x%08" PFMT64x "\n", core->offset);
+			return false;
 		}
 
-		int *argc = (int*) malloc (sizeof (int));
-		char **argv = r_str_argv (input, argc);
+		int argc;
+		R_LOG_INFO ("test: %s", input);
+		char **argv = r_str_argv (input, &argc);
+		R_LOG_INFO ("test: %d", argc);
 
-		if (*argc != 3) {
+		if (argc != 3) {
 			r_cons_printf ("Usage: afen new_name old_name\n");
 			return true;
 		}
+
+		if (!argv) {
+			R_LOG_ERROR ("Can't get args");
+			return true;
+		}
+
+		R_LOG_INFO ("Non repl:");
+		R_LOG_INFO ("New Name:", argv[1]);
+		R_LOG_INFO ("Old Name:", argv[2]);
+
+		RAfenRepl *repl = (RAfenRepl*) malloc (sizeof (RAfenRepl));
+		repl->new_name = argv[1];
+		repl->old_name = argv[2];
+
+		R_LOG_INFO ("Repl:");
+		R_LOG_INFO ("New Name:", repl->new_name);
+		R_LOG_INFO ("Old Name:", repl->old_name);
+		ht_up_insert (ht, fcn->addr, repl);
+		R_LOG_INFO ("LOL0");
 
 		r_list_append (new_names, argv[1]);
 		r_list_append (old_names, argv[2]);
