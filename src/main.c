@@ -9,49 +9,24 @@ typedef struct RAfenRepl {
 	char *new_name;
 } RAfenRepl;
 
-static R_TH_LOCAL RList *old_names;
-static R_TH_LOCAL RList *new_names;
 static R_TH_LOCAL HtUP *ht; // hash table
 
 // afen parser
 static int r_parse_afen(RParse *p, const char *data, char *str) {
 	char *input = strdup (data);
 
-	//RCmd *rcmd = (RCmd *) p->user;
-	//RCore *core = (RCore *) rcmd->data;
 	RCore *core = (RCore *) p->analb.anal->user;
 
-	int i, n = r_list_length (old_names);
-	R_LOG_INFO ("offset: 0x%08" PFMT64x "\n", core->offset);
 	RAnalFunction *fcn = r_anal_get_function_at (core->anal, core->offset);
 
 	if (fcn) {
-		R_LOG_INFO ("Function at 0x%08" PFMT64x "\n", fcn->addr);
-	} else {
-		R_LOG_INFO ("No Function at 0x%08" PFMT64x "\n", core->offset);
-		return false;
-	}
-
-	RAfenRepl *repl = ht_up_find (ht, fcn->addr, NULL);
-	if (repl) {
-		R_LOG_INFO ("LOL");
-		R_LOG_INFO ("New name: %s", repl->new_name);
-		R_LOG_INFO ("Old name: %s", repl->old_name);
-	}
-
-
-
-	if (n) {
-		RListIter *sio = old_names->head;
-		RListIter *sin = new_names->head;
-
-		for (i = 0; i < n; i++) {
-			input = r_str_replace_all (input, sio->data, sin->data);
-
-			sio = r_list_iter_get_next (sio);
-			sin = r_list_iter_get_next (sin);
+		RVector *vec = ht_up_find (ht, fcn->addr, NULL);
+		if (vec) {
+			RAfenRepl *repl;
+			r_vector_foreach (vec, repl) {
+				input = r_str_replace_all (input, repl->old_name, repl->new_name);
+			}
 		}
-
 	}
 
 	strcpy (str, input);
@@ -65,14 +40,20 @@ RParsePlugin r_parse_plugin_afen = {
 	.parse = r_parse_afen,
 };
 
-static inline void repl_value_free(HtUPKv *kv) {
-	RAfenRepl *repl = (RAfenRepl *) kv->value;
+static inline void repl_free_afen(void *e, void *user ) {
+	RAfenRepl *repl = (RAfenRepl *) e;
 	if (repl) {
 		R_FREE (repl->old_name);
 		R_FREE (repl->new_name);
 	}
 }
 
+static inline void vector_value_free_afen(HtUPKv *kv) {
+	RVector *vec = (RVector *) kv->value;
+	if (vec) {
+		r_vector_free (vec);
+	}
+}
 
 // sets afen parser
 static int r_core_init_afen(void *user, const char *input) {
@@ -81,26 +62,17 @@ static int r_core_init_afen(void *user, const char *input) {
 
 	r_parse_plugin_add (core->parser, &r_parse_plugin_afen);
 
-	/*<ut64 fcnptr, RAfenRepl *repl>*/ ht = ht_up_new (NULL, repl_value_free, NULL);
+	/*<ut64, RVector<RAfenRepl*>>*/ ht = ht_up_new (NULL, vector_value_free_afen, NULL);
 	if (!ht) {
 		R_LOG_ERROR ("Fail to initialize hashtable");
 		ht_up_free (ht);
 		return false;
 	}
 
-	old_names = r_list_new ();
-	new_names = r_list_new ();
-	// newf instead of new
-	
 	return true;
 }
 
 static int r_core_fini_afen(void *user, const char *input) {
-	r_list_free (old_names);
-	r_list_free (new_names);
-	old_names = NULL;
-	new_names = NULL;
-
 	ht_up_free (ht);
 	ht = NULL;
 
@@ -111,22 +83,11 @@ static int r_core_call_afen(void *user, const char *input) {
 	RCore *core = (RCore *) user;
 
 	if (r_str_startswith (input, "afen")) {
-		RAnalFunction *fcn = r_anal_get_function_at (core->anal, core->offset);
-
-		if (fcn) {
-			r_cons_printf ("Function at 0x%08" PFMT64x "\n", fcn->addr);
-		} else {
-			r_cons_printf ("No Function at 0x%08" PFMT64x "\n", core->offset);
-			return false;
-		}
-
 		int argc;
-		R_LOG_INFO ("test: %s", input);
 		char **argv = r_str_argv (input, &argc);
-		R_LOG_INFO ("test: %d", argc);
 
 		if (argc != 3) {
-			r_cons_printf ("Usage: afen new_name old_name\n");
+			R_LOG_INFO ("Usage: afen new_name old_name");
 			return true;
 		}
 
@@ -135,19 +96,38 @@ static int r_core_call_afen(void *user, const char *input) {
 			return false;
 		}
 
-		RAfenRepl *repl = (RAfenRepl*) malloc (sizeof (RAfenRepl));
+		RAnalFunction *fcn = r_anal_get_function_at (core->anal, core->offset);
+
+		if (!fcn) {
+			R_LOG_ERROR ("No Function at 0x%08" PFMT64x, core->offset);
+			R_LOG_INFO ("Use afen inside a function!");
+			return false;
+		}
+
+		RVector *vec = ht_up_find (ht, fcn->addr, NULL);
+
+		if (!vec) {
+			vec = r_vector_new (sizeof (RAfenRepl), repl_free_afen, NULL);
+			ht_up_insert (ht, fcn->addr, vec);
+		}
+
+		bool updated = false;
+		RAfenRepl *repl;
+		r_vector_foreach (vec, repl) {
+			if (!strcmp (repl->old_name, argv[2])) {
+				repl->new_name = argv[1];
+				updated = true;
+				break;
+			}
+		}
+
+		if (updated) return true;
+
+		repl = (RAfenRepl*) malloc (sizeof (RAfenRepl));
 		repl->new_name = argv[1];
 		repl->old_name = argv[2];
-		
 
-		R_LOG_INFO ("Repl:");
-		R_LOG_INFO ("New Name: %s", repl->new_name);
-		R_LOG_INFO ("Old Name: %s", repl->old_name);
-		ht_up_insert (ht, fcn->addr, repl);
-		R_LOG_INFO ("LOL0");
-
-		r_list_append (new_names, argv[1]);
-		r_list_append (old_names, argv[2]);
+		r_vector_push (vec, repl);
 
 		return true;
 	}
